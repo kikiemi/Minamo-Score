@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Minamo Score - 音声や録音を読み取り、楽譜・MIDI・MusicXML・PDFに変換できる採譜ツール</title>
+<meta name="description" content="音声や録音を読み取り、楽譜・MIDI・MusicXML・PDFに変換できる採譜ツール。">
+<meta name="theme-color" content="#f57a1a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles/main.css">
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.7/build/opensheetmusicdisplay.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.7.0/dist/svg2pdf.umd.min.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-copy">
+      <span class="brand-name">Minamo Score</span>
+      <span class="brand-sub">音声を楽譜・MIDIへ変換</span>
+    </div>
+  </div>
+  <span class="status-pill" id="status_pill">待機中</span>
+</header>
+
+<main class="layout">
+
+  <!-- ===== サイドバー ===== -->
+  <aside class="sidebar">
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2><span class="kicker">入力</span>音声を読み込む</h2>
+        <span class="pill" id="source_badge">未選択</span>
+      </div>
+
+      <div class="dropzone" id="drop_zone">
+        <p class="drop-title">ここへドロップ</p>
+        <p class="drop-sub">wav / mp3 / ogg / flac / m4a / webm / mp4</p>
+        <div class="btn-row">
+          <label class="btn btn-primary btn-file">
+            ファイルを選ぶ
+            <input id="file_input" type="file" accept="audio/*,video/mp4,.wav,.mp3,.ogg,.flac,.m4a,.webm,.mp4">
+          </label>
+          <button class="btn" id="btn_clear_source">クリア</button>
+        </div>
+      </div>
+
+      <div class="source-card">
+        <p class="source-name" id="source_name">音声が選択されていません</p>
+        <p class="source-meta" id="source_meta">ファイルを選ぶか録音してください。</p>
+        <audio id="source_preview" class="audio-preview is-hidden" controls></audio>
+      </div>
+
+      <div class="record-block">
+        <div class="record-head">
+          <h3>録音</h3>
+          <span class="record-status" id="record_status">待機中</span>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="btn_record" type="button">録音開始</button>
+          <button class="btn btn-danger" id="btn_stop_record" type="button" disabled>停止</button>
+          <button class="btn" id="btn_use_recording" type="button" disabled>この録音を使う</button>
+        </div>
+        <audio id="record_preview" class="audio-preview is-hidden" controls></audio>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2><span class="kicker">設定</span>変換設定</h2>
+      </div>
+
+      <div class="field-grid">
+        <label class="field">
+          <span class="field-name">モード</span>
+          <select id="sel_profile">
+            <option value="piano" selected>ピアノ</option>
+            <option value="melody">単体楽器・メロディ</option>
+            <option value="guitar">ギター</option>
+            <option value="dense">歌入り・複雑な音源</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-name">解析品質</span>
+          <select id="sel_quality">
+            <option value="high" selected>高精度（ピアノ特化AI・初回約50MB）</option>
+            <option value="fast">標準（軽量・速い）</option>
+          </select>
+        </label>
+
+        
+
+        <label class="field">
+          <span class="field-name">仕上がり</span>
+          <select id="sel_density">
+            <option value="preserve" selected>できるだけ残す（忠実）</option>
+            <option value="balanced">標準</option>
+            <option value="clean">すっきり</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-name">音価の細かさ</span>
+          <select id="sel_grid">
+            <option value="auto" selected>自動（3連符も判定）</option>
+            <option value="12">8分まで</option>
+            <option value="6">16分まで</option>
+            <option value="3">32分まで</option>
+            <option value="8">8分3連</option>
+            <option value="4">16分3連</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-name">テンポ</span>
+          <span class="field-inline">
+            <select id="sel_bpm_mode">
+              <option value="auto" selected>自動</option>
+              <option value="manual">指定</option>
+            </select>
+            <input id="in_bpm" type="number" min="40" max="240" step="1" value="120" disabled>
+          </span>
+        </label>
+
+        <label class="field">
+          <span class="field-name">左右の境目（MIDIノート）</span>
+          <span class="field-inline">
+            <select id="sel_split_mode">
+              <option value="auto" selected>自動</option>
+              <option value="manual">指定</option>
+            </select>
+            <input id="in_split" type="number" min="36" max="84" step="1" value="60" disabled>
+          </span>
+        </label>
+
+        <label class="field">
+          <span class="field-name">拍子</span>
+          <span class="field-inline tight">
+            <input id="in_ts_num" type="number" min="1" max="12" step="1" value="4">
+            <span class="slash">/</span>
+            <select id="sel_ts_den">
+              <option value="4" selected>4</option>
+              <option value="8">8</option>
+            </select>
+          </span>
+        </label>
+
+        <label class="field">
+          <span class="field-name">1ページの小節数</span>
+          <select id="sel_mpp">
+            <option value="4" selected>4小節</option>
+            <option value="6">6小節</option>
+            <option value="8">8小節</option>
+          </select>
+        </label>
+
+        <label class="check field-wide">
+          <input type="checkbox" id="chk_vocal_cut">
+          <span>歌声を抑える（ステレオ音源のみ・伴奏を拾いやすく）</span>
+        </label>
+      </div>
+
+      <div class="status-card" id="global_status">ここに進行状況が表示されます。</div>
+      <div class="progress-bar"><span id="progress_bar"></span></div>
+      <p class="progress-text" id="progress_text">待機中</p>
+
+      <button class="btn btn-primary btn-wide btn-big" id="btn_convert" type="button">変換する</button>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2><span class="kicker">履歴</span>変換済みの結果</h2>
+        <span class="pill">この端末に最新30件</span>
+      </div>
+      <ul class="history-list" id="history_list">
+        <li class="history-empty">まだありません。変換が終わると自動で保存されます。</li>
+      </ul>
+    </section>
+
+    
+  </aside>
+
+  <!-- ===== ワークスペース ===== -->
+  <section class="workspace">
+    <div class="empty-state" id="empty_state">
+      <span class="pill">案内</span>
+      <h1>変換すると、ここに楽譜と再生画面が表示されます。</h1>
+      <p>ページ送り・再生・MIDI / MusicXML / PDF の保存ができます。<br>再生と「演奏どおりMIDI」は、量子化前の<b>元演奏そのまま</b>のタイミングです。</p>
+    </div>
+
+    <div class="result is-hidden" id="result_section">
+      <div class="summary-grid">
+        <article class="summary-card"><span>演奏時間</span><strong id="sum_duration">–</strong></article>
+        <article class="summary-card"><span>検出ノート</span><strong id="sum_notes">–</strong></article>
+        <article class="summary-card"><span>テンポ</span><strong id="sum_bpm">–</strong></article>
+        <article class="summary-card"><span>音域</span><strong id="sum_range">–</strong></article>
+        <article class="summary-card"><span>細かさ</span><strong id="sum_grid">–</strong></article>
+        <article class="summary-card"><span>ページ</span><strong id="sum_pages">–</strong></article>
+      </div>
+
+      <section class="panel score-panel">
+        <div class="score-topbar">
+          <h2><span class="kicker">楽譜</span><span id="page_title">ページ 1</span></h2>
+          <div class="score-exports">
+            <button class="btn btn-sm" id="btn_dl_midi_raw" title="量子化なし・元演奏のタイミング">演奏どおりMIDI</button>
+            <button class="btn btn-sm" id="btn_dl_midi" title="楽譜と同じ量子化タイミング">楽譜どおりMIDI</button>
+            <button class="btn btn-sm" id="btn_dl_xml">MusicXML</button>
+            <button class="btn btn-sm" id="btn_dl_pdf">PDF</button>
+          </div>
+        </div>
+
+        <div class="control-strip">
+          <div class="page-controls">
+            <button class="btn btn-sm" id="btn_prev_page">前へ</button>
+            <span class="page-indicator" id="page_indicator">1 / 1</span>
+            <button class="btn btn-sm" id="btn_next_page">次へ</button>
+          </div>
+          <div class="zoom-controls">
+            <button class="btn btn-sm" id="btn_zoom_out">縮小</button>
+            <button class="btn btn-sm" id="btn_zoom_fit">標準</button>
+            <button class="btn btn-sm" id="btn_zoom_in">拡大</button>
+          </div>
+        </div>
+
+        <div class="sheet-frame" id="sheet_frame">
+          <div class="sheet-wrap" id="sheet_wrap">
+            <div class="playhead is-hidden" id="playhead"></div>
+            <div id="sheet_host"></div>
+          </div>
+        </div>
+
+        <div class="transport">
+          <button class="btn btn-primary" id="btn_play">再生</button>
+          <button class="btn" id="btn_pause">一時停止</button>
+          <button class="btn" id="btn_stop">停止</button>
+          <label class="check"><input type="checkbox" id="chk_follow" checked><span>譜面を追う</span></label>
+          <span class="transport-time" id="transport_time">0:00 / 0:00</span>
+        </div>
+
+        <div class="roll-block">
+          <p class="roll-note">全体図（タップで再生位置を移動）</p>
+          <canvas id="roll_canvas" class="roll-canvas" height="160"></canvas>
+        </div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<div id="hidden_sheet" class="hidden-sheet" aria-hidden="true"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script type="module" src="dist/app.js"></script>
+</body>
+</html>

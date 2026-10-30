@@ -1,0 +1,9 @@
+{
+  "name": "Minamo Score - 採譜ツール",
+  "short_name": "Minamo Score",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fff6ec",
+  "theme_color": "#f57a1a",
+  "icons": []
+}
